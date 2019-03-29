@@ -4,9 +4,9 @@
 #' Options for DS include: 'complete','survey','comlogs','details','observer','millim','totals','totalsfemtran' and 'juveniles'.
 #' Any of these arguments called as listed return the data object - 'complete' loads ALL data sources.
 #' To make the data file from scratch would require a 'XXXX.redo', where XXXX is the option listed above.
-#' @param oracle.server This is the server
-#' @param oracle.username This is the username
-#' @param oracle.password This is the password
+#' @param oracle.server default is \code{NULL} This is the server
+#' @param oracle.username default is \code{NULL} This is the username
+#' @param oracle.password default is \code{NULL} This is the password
 #' @param datadirectory This is where you want to store your data (or where your data is already stored)
 #' @param showprogress default is FALSE
 #' @importFrom lubridate year
@@ -21,15 +21,29 @@
 #' @export
 #'
 shrimp.db = function( DS="complete.redo",
-                      oracle.server=oracle.server,
-                      oracle.username=oracle.username,
-                      oracle.password=oracle.password,
+                      oracle.server=NULL,
+                      oracle.username=NULL,
+                      oracle.password=NULL,
                       datadirectory = datadirectory,
                       showprogress = F) {
 
   DS = tolower(DS)   #make DS parameter case-insensitive
   ts <- Sys.Date()   #create time stamp
 
+  thiscon=NULL
+  if (any(is.null(oracle.server) | is.null(oracle.username) | is.null(oracle.password)) & grepl(DS, pattern = "redo")){
+    cat("To 'redo' data, you will need to provide your Oracle credentials. Aborting.\n")
+    return()
+  } else if (grepl(DS, pattern = "redo")){ 
+    # make the oracle connection
+    thiscon = RODBC::odbcConnect(oracle.server, uid=oracle.username,pwd=oracle.password, believeNRows=F)
+    if (is.null(thiscon)){
+      cat("No valid connection, aborting\n")
+      return()
+    }
+  }
+  
+  
   #create the folder to store extractions products (rdata and csvs)
   if (is.null(datadirectory)){
     cat("Requires a value for datadirectory.  Aborting\n")
@@ -253,13 +267,7 @@ shrimp.db = function( DS="complete.redo",
     load(r_nm, .GlobalEnv)
     if (this_showprogress)cat(paste("Loaded:",r_nm,"\n"))
   }
-  # make the oracle connection
-  thiscon = RODBC::odbcConnect(oracle.server, uid=oracle.username,pwd=oracle.password, believeNRows=F)
-  if (is.null(thiscon)){
-    cat("No valid connection, aborting\n")
-    return()
-  }
-
+ 
   if (any(DS %in% c("complete","complete.redo"))) {
     complete.flag = ifelse(any(DS %in% c("complete.redo")),T,F)
     do.survey(con=thiscon,redo=complete.flag, this_showprogress=showprogress)
@@ -308,5 +316,5 @@ shrimp.db = function( DS="complete.redo",
     }
   }
   gc()
-  RODBC::odbcClose(thiscon)
+  if (!is.null(thiscon))RODBC::odbcClose(thiscon)
 }
